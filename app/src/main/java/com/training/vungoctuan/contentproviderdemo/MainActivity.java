@@ -18,7 +18,7 @@ import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
     public static final int CONTACT_LOADER_ID = 1;
-    public final static int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 2;
+    public static final int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 2;
     private SimpleCursorAdapter mAdapter;
 
     @Override
@@ -28,18 +28,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupCursorAdapter() {
-        String[] uiBindFrom = {ContactsContract.Contacts.DISPLAY_NAME,
-            ContactsContract.Contacts.PHOTO_URI};
+        String[] uiBindFrom = {
+            ContactsContract.Contacts.DISPLAY_NAME,
+            ContactsContract.Contacts.PHOTO_URI,
+            ContactsContract.Data.DATA1};
         // View IDs which will have the respective column data inserted
-        int[] uiBindTo = {R.id.tvName, R.id.ivImage};
+        int[] uiBindTo = {R.id.tvName, R.id.ivImage, R.id.tvPhone};
         // Create the simple cursor adapter to use for our list
         // specifying the template to inflate (item_contact),
         mAdapter = new SimpleCursorAdapter(
             this, R.layout.item_contact,
             null, uiBindFrom, uiBindTo,
             0);
-
-        
     }
 
     private LoaderManager.LoaderCallbacks<Cursor> contactsLoader =
@@ -50,10 +50,11 @@ public class MainActivity extends AppCompatActivity {
                 // Define the columns to retrieve
                 String[] projectionFields = new String[]{ContactsContract.Contacts._ID,
                     ContactsContract.Contacts.DISPLAY_NAME,
-                    ContactsContract.Contacts.PHOTO_URI};
+                    ContactsContract.Contacts.PHOTO_URI,
+                    ContactsContract.Data.DATA1};
                 // Construct the loader
                 CursorLoader cursorLoader = new CursorLoader(MainActivity.this,
-                    ContactsContract.Contacts.CONTENT_URI, // URI
+                    ContactsContract.Data.CONTENT_URI, // URI
                     projectionFields, // projection fields
                     null, // the selection criteria
                     null, // the selection args
