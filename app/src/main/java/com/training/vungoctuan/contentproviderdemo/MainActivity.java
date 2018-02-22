@@ -1,25 +1,45 @@
 package com.training.vungoctuan.contentproviderdemo;
 
 import android.Manifest;
+import android.app.LoaderManager;
+import android.content.CursorLoader;
+import android.content.Loader;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.net.Uri;
+import android.os.Bundle;
 import android.provider.ContactsContract;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.app.LoaderManager;
+import android.support.v4.app.FragmentManager;
 import android.support.v4.content.ContextCompat;
-import android.support.v4.content.CursorLoader;
-import android.support.v4.content.Loader;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.SimpleCursorAdapter;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity {
+import com.training.vungoctuan.contentproviderdemo.fragments.DetailsDialogFragment;
+
+import static android.provider.ContactsContract.Contacts;
+
+public class MainActivity extends AppCompatActivity
+    implements LoaderManager.LoaderCallbacks<Cursor>, AdapterView.OnItemClickListener {
     public static final int CONTACT_LOADER_ID = 1;
     public static final int MY_PERMISSIONS_REQUEST_READ_CONTACTS = 2;
+    public static final int MY_PERMISSIONS_REQUEST_PHONE_CALL = 3;
     private SimpleCursorAdapter mAdapter;
+    private ListView lvContacts;
+    private long mContactId;
+    private String mContactKey;
+    private Uri mContactUri;
+    private FragmentManager fm;
+    private DetailsDialogFragment dialogFragment;
+    // The column index for the _ID column
+    private static final int CONTACT_ID_INDEX = 0;
+    // The column index for the LOOKUP_KEY column
+    private static final int LOOKUP_KEY_INDEX = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -27,82 +47,35 @@ public class MainActivity extends AppCompatActivity {
         onRequestPermissions();
     }
 
-    private void setupCursorAdapter() {
-        String[] uiBindFrom = {
-            ContactsContract.Contacts.DISPLAY_NAME,
-            ContactsContract.Contacts.PHOTO_URI,
-            ContactsContract.Data.DATA1};
-        // View IDs which will have the respective column data inserted
-        int[] uiBindTo = {R.id.tvName, R.id.ivImage, R.id.tvPhone};
-        // Create the simple cursor adapter to use for our list
-        // specifying the template to inflate (item_contact),
-        mAdapter = new SimpleCursorAdapter(
-            this, R.layout.item_contact,
-            null, uiBindFrom, uiBindTo,
-            0);
+    @Override
+    public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+        // Define the columns to retrieve
+        if (id == CONTACT_LOADER_ID) {
+            String[] projectionFields = new String[]{Contacts._ID,
+                Contacts.DISPLAY_NAME_PRIMARY,
+                Contacts.Photo.PHOTO_URI};
+            // Construct the loader
+            CursorLoader cursorLoader = new CursorLoader(MainActivity.this,
+                Contacts.CONTENT_URI, // URI
+                projectionFields, // projection fields
+                null, // the selection criteria
+                null, // the selection args
+                null // the sort order
+            );
+            // Return the loader for use
+            return cursorLoader;
+        }
+        return null;
     }
 
-    private LoaderManager.LoaderCallbacks<Cursor> contactsLoader =
-        new LoaderManager.LoaderCallbacks<Cursor>() {
-            // Create and return the actual cursor loader for the contacts data
-            @Override
-            public Loader<Cursor> onCreateLoader(int id, Bundle args) {
-                // Define the columns to retrieve
-                String[] projectionFields = new String[]{ContactsContract.Contacts._ID,
-                    ContactsContract.Contacts.DISPLAY_NAME,
-                    ContactsContract.Contacts.PHOTO_URI,
-                    ContactsContract.Data.DATA1};
-                // Construct the loader
-                CursorLoader cursorLoader = new CursorLoader(MainActivity.this,
-                    ContactsContract.Data.CONTENT_URI, // URI
-                    projectionFields, // projection fields
-                    null, // the selection criteria
-                    null, // the selection args
-                    null // the sort order
-                );
-                // Return the loader for use
-                return cursorLoader;
-            }
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
+        mAdapter.swapCursor(cursor);
+    }
 
-            // When the system finishes retrieving the Cursor through the CursorLoader,
-            // a call to the onLoadFinished() method takes place.
-            @Override
-            public void onLoadFinished(Loader<Cursor> loader, Cursor cursor) {
-                // The swapCursor() method assigns the new Cursor to the adapter
-                mAdapter.swapCursor(cursor);
-            }
-
-            // This method is triggered when the loader is being reset
-            // and the loader data is no longer available. Called if the data
-            // in the provider changes and the Cursor becomes stale.
-            @Override
-            public void onLoaderReset(Loader<Cursor> loader) {
-                // Clear the Cursor we were using with another call to the swapCursor()
-                mAdapter.swapCursor(null);
-            }
-        };
-
-    //Request Permission
-    void onRequestPermissions() {
-        if (ContextCompat.checkSelfPermission(this,
-            Manifest.permission.READ_CONTACTS)
-            != PackageManager.PERMISSION_GRANTED) {
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                Manifest.permission.READ_CONTACTS)) {
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-            } else {
-                // No explanation needed, we can request the permission.
-                ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.READ_CONTACTS},
-                    MY_PERMISSIONS_REQUEST_READ_CONTACTS);
-                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-                // app-defined int constant. The callback method gets the
-                // result of the request.
-            }
-        } else initContacts();
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+        mAdapter.swapCursor(null);
     }
 
     @Override
@@ -113,15 +86,38 @@ public class MainActivity extends AppCompatActivity {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0
                     && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    // permission was granted, yay! Do the
-                    // contacts-related task you need to do.
-                    Toast.makeText(this, "Permission Granted!Thanks", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(
+                        this,
+                        "Permission READ_CONTACTS Granted!Thanks",
+                        Toast.LENGTH_SHORT)
+                        .show();
                     initContacts();
                 } else {
-                    Toast.makeText(this, "Permission Denied!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(
+                        this,
+                        "Permission READ_CONTACTS Denied!",
+                        Toast.LENGTH_SHORT)
+                        .show();
                     onRequestPermissions();
-                    // permission denied, boo! Disable the
-                    // functionality that depends on this permission.
+                }
+                return;
+            }
+            case MY_PERMISSIONS_REQUEST_PHONE_CALL: {
+                if (grantResults.length > 0
+                    && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Toast.makeText(
+                        this,
+                        "Permission PHONE_CALL Granted!Thanks",
+                        Toast.LENGTH_SHORT)
+                        .show();
+                    initContacts();
+                } else {
+                    Toast.makeText(
+                        this,
+                        "Permission PHONE_CALL Denied!",
+                        Toast.LENGTH_SHORT)
+                        .show();
+                    onRequestPermissions();
                 }
                 return;
             }
@@ -130,12 +126,92 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+// Get the Cursor
+        Cursor cursor = ((SimpleCursorAdapter) parent.getAdapter()).getCursor();
+        // Move to the selected contact
+        cursor.moveToPosition(position);
+        // Get the _ID value
+        mContactId = cursor.getLong(CONTACT_ID_INDEX);
+        // Get the selected LOOKUP KEY
+        mContactKey = cursor.getString(LOOKUP_KEY_INDEX);
+        // Create the contact's content Uri
+        Bundle args = new Bundle();
+        args.putString("name", mContactKey);
+        args.putString("phone", getContactPhoneNumber());
+        dialogFragment.setArguments(args);
+        dialogFragment.show(fm, "dialogFragment");
+    }
+
+    private void setupCursorAdapter() {
+        String[] uiBindFrom = {
+            Contacts.DISPLAY_NAME_PRIMARY,
+            Contacts.Photo.PHOTO_URI};
+        // View IDs which will have the respective column data inserted
+        int[] uiBindTo = {R.id.tvName, R.id.ivImage};
+        // Create the simple cursor adapter to use for our list
+        // specifying the template to inflate (item_contact),
+        mAdapter = new SimpleCursorAdapter(
+            this,
+            R.layout.item_contact,
+            null,
+            uiBindFrom,
+            uiBindTo,
+            0);
+    }
+
     private void initContacts() {
         setContentView(R.layout.activity_main);
         setupCursorAdapter();
-        ListView lvContacts = findViewById(R.id.lvContacts);
+        //Init listview
+        lvContacts = findViewById(R.id.lvContacts);
         lvContacts.setAdapter(mAdapter);
-        getSupportLoaderManager().initLoader(CONTACT_LOADER_ID
-            , new Bundle(), contactsLoader);
+        lvContacts.setOnItemClickListener(this);
+        getLoaderManager().initLoader(CONTACT_LOADER_ID
+            , null, this);
+        initFragment();
+    }
+
+    private void initFragment() {
+        fm = getSupportFragmentManager();
+        dialogFragment = DetailsDialogFragment.newInstance();
+    }
+
+    //Request Permission
+    void onRequestPermissions() {
+        if (ContextCompat.checkSelfPermission(this,
+            Manifest.permission.READ_CONTACTS)
+            != PackageManager.PERMISSION_GRANTED) {
+            // Should we show an explanation?
+            ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.READ_CONTACTS},
+                MY_PERMISSIONS_REQUEST_READ_CONTACTS);
+        } else if (ContextCompat.checkSelfPermission(this,
+            Manifest.permission.CALL_PHONE)
+            != PackageManager.PERMISSION_GRANTED) {
+            // Should we show an explanation?
+            ActivityCompat.requestPermissions(this,
+                new String[]{Manifest.permission.CALL_PHONE},
+                MY_PERMISSIONS_REQUEST_PHONE_CALL);
+        } else initContacts();
+    }
+
+    private String getContactPhoneNumber() {
+        // Using the contact ID now we will get contact phone number
+        Cursor cursorPhone =
+            getContentResolver().query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                new String[]{ContactsContract.CommonDataKinds.Phone.NUMBER},
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID + " = ? AND " +
+                    ContactsContract.CommonDataKinds.Phone.TYPE + " = " +
+                    ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE,
+                new String[]{String.valueOf(mContactId)},
+                null);
+        if (cursorPhone.moveToFirst()) {
+            return cursorPhone.getString(cursorPhone.getColumnIndex(ContactsContract.CommonDataKinds
+                .Phone.NUMBER));
+        }
+        cursorPhone.close();
+        return "No Number";
     }
 }
